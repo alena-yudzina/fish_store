@@ -1,8 +1,4 @@
-import json
-import os
-
 import requests
-from dotenv import load_dotenv
 
 
 def get_token(client_id):
@@ -62,7 +58,8 @@ def download_file(client_id, file_id):
     return file_url
 
 
-def create_customer(access_token):
+def create_customer(client_id, email):
+    access_token = get_token(client_id)
 
     headers = {
         'Authorization': access_token,
@@ -72,13 +69,28 @@ def create_customer(access_token):
     data = {
         "data": {
             "type": "customer",
-            "name": "Ron Swanson",
-            "email": "ron@swanson.com",
-            "password": "mysecretpassword"
+            "name": "name",
+            "email": email,
         }
     }
 
-    response = requests.post('https://api.moltin.com/v2/customers', headers=headers, data=data)
+    response = requests.post('https://api.moltin.com/v2/customers', headers=headers, json=data)
+    response = response.json()
+    return response['data']['id']
+
+
+def get_customer(client_id, customer_id):
+    access_token = get_token(client_id)
+
+    headers = {
+        'Authorization': access_token,
+    }
+
+    response = requests.get(
+        'https://api.moltin.com/v2/customers/{}'.format(customer_id),
+        headers=headers
+    )
+    return response.json()
 
 
 def add_item_to_cart(client_id, product_id, cart_id, quantity):

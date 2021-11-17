@@ -1,5 +1,3 @@
-import json
-import logging
 import os
 
 import redis
@@ -8,8 +6,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
                           MessageHandler, Updater)
 
-from store import (add_item_to_cart, delete_item_from_cart, download_file,
-                   get_cart_items, get_product, get_products,
+from store import (add_item_to_cart, create_customer, delete_item_from_cart,
+                   download_file, get_cart_items, get_product, get_products,
                    make_cart_description)
 
 _database = None
@@ -107,7 +105,12 @@ def show_cart(update, context):
         [InlineKeyboardButton('Убрать из корзины {}'.format(product['name']), callback_data=product['id'])]
             for product in products
     ]
-    keyboard.append([InlineKeyboardButton('В меню', callback_data='menu')])
+    keyboard.append(
+        [InlineKeyboardButton('В меню', callback_data='menu')]
+    )
+    keyboard.append(
+        [InlineKeyboardButton('Оплатить', callback_data='pay')]
+    )
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -127,6 +130,11 @@ def handle_cart(update, context):
             reply_markup=reply_markup
         )
         return 'HANDLE_MENU'
+    elif answer == 'pay':
+        query.message.reply_text(
+            text='Пожалуйста, пришлите ваш email.'
+        )
+        return 'WAITING_EMAIL'
     else:
         delete_item_from_cart(
             store_token,
@@ -134,6 +142,15 @@ def handle_cart(update, context):
             product_id=answer
         )
         return 'HANDLE_CART'
+
+
+def waiting_email(update, context):
+    email = update.message.text
+    create_customer(store_token, email)
+    update.message.reply_text(
+        text=f'Ваш email: {email}'
+    )
+    return 'SHOW_CART'
 
 
 def handle_users_reply(update, context):
@@ -159,11 +176,9 @@ def handle_users_reply(update, context):
         'HANDLE_DESCRIPTION': handle_description,
         'SHOW_CART': show_cart,
         'HANDLE_CART': handle_cart,
+        'WAITING_EMAIL': waiting_email,
     }
     state_handler = states_functions[user_state]
-    # Если вы вдруг не заметите, что python-telegram-bot перехватывает ошибки.
-    # Оставляю этот try...except, чтобы код не падал молча.
-    # Этот фрагмент можно переписать.
     try:
         next_state = state_handler(update, context)
         db.set(chat_id, next_state)
