@@ -104,6 +104,19 @@ def add_item_to_cart(client_id, product_id, cart_id, quantity):
     )
 
 
+def delete_item_from_cart(client_id, cart_id, product_id):
+    access_token = get_token(client_id)
+
+    headers = {
+        'Authorization': access_token,
+    }
+
+    response = requests.delete(
+        'https://api.moltin.com/v2/carts/{}/items/{}'.format(cart_id, product_id),
+        headers=headers
+    )
+
+
 def get_cart_items(client_id, cart_id):
     access_token = get_token(client_id)
 
@@ -134,16 +147,3 @@ def make_cart_description(cart):
     
     description += f'Total: {cart_price}'
     return description
-
-
-def main():
-    load_dotenv()
-    access_token = get_token(os.environ['CLIENT_ID'])
-    cart_id = 1
-    product_id = '85357a57-42d8-4219-9392-25f658dc438f'
-    add_item_to_cart(access_token, product_id, cart_id)
-    print(get_cart_items(access_token, 1))
-
-
-if __name__ == '__main__':
-    main()

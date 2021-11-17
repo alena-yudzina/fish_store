@@ -8,12 +8,13 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
                           MessageHandler, Updater)
 
-from store import (add_item_to_cart, download_file, get_cart_items,
-                   get_product, get_products, make_cart_description)
+from store import (add_item_to_cart, delete_item_from_cart, download_file,
+                   get_cart_items, get_product, get_products,
+                   make_cart_description)
 
 _database = None
 
-def start(bot, update):
+def start(update, context):
     products = get_products(store_token)
 
     keyboard = [
@@ -22,23 +23,30 @@ def start(bot, update):
     ]
     keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
 
+    context.user_data['keyboard'] = keyboard
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     update.message.reply_text('Please choose:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
 
 
-def handle_menu(bot, update):
+def handle_menu(update, context):
+    keyboard = [
+        [
+            InlineKeyboardButton('1 кг', callback_data=1),
+            InlineKeyboardButton('5 кг', callback_data=5),
+            InlineKeyboardButton('10 кг', callback_data=10)
+        ],
+        [InlineKeyboardButton('Корзина', callback_data='cart')],
+        [InlineKeyboardButton('Назад', callback_data='back')]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     query = update.callback_query
-    cart_id = query.message.chat_id
-
-    if query.data == 'cart':
-        cart = get_cart_items(store_token, cart_id)
-        text = make_cart_description(cart)
-        bot.send_message(query.message.chat_id, text)
-        return 'HANDLE_MENU'
-
     product_id = query.data
+    context.user_data['product_id'] = product_id
+
     product = get_product(store_token, product_id)
 
     name = product['name']
@@ -49,69 +57,87 @@ def handle_menu(bot, update):
     product_description = '{0}\n\n{1} per kg\n\n{2}'.format(
         name, price, description
     )
-    
-    keyboard = [
-        [
-            InlineKeyboardButton('1 кг', callback_data=f'1_{product_id}'),
-            InlineKeyboardButton('5 кг', callback_data=f'5_{product_id}'),
-            InlineKeyboardButton('10 кг', callback_data=f'10_{product_id}')
-        ],
-        [InlineKeyboardButton('Корзина', callback_data='cart')],
-        [InlineKeyboardButton('Назад', callback_data='back')]
-    ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    bot.send_photo(
+    context.bot.send_photo(
         chat_id=query.message.chat_id,
         photo=img_url,
         caption=product_description,
         reply_markup=reply_markup
     )
+    context.bot.delete_message(
+        chat_id=update.effective_chat.id,
+        message_id=update.callback_query.message.message_id
+    )
     return 'HANDLE_DESCRIPTION'
 
 
-def handle_description(bot, update):
+def handle_description(update, context):
+    keyboard = context.user_data['keyboard']
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     query = update.callback_query
     answer = query.data
-    cart_id = query.message.chat_id
-    print(type(answer))
+    cart_id = update.effective_chat.id
+    product_id = context.user_data['product_id']
 
     if answer == 'back':
+        query.message.reply_text(
+            text='Please choose:',
+            reply_markup=reply_markup
+        )
         return 'HANDLE_MENU'
     elif answer == 'cart':
         cart = get_cart_items(store_token, cart_id)
-        #print(json.dumps(cart, indent=2))
         text = make_cart_description(cart)
-        bot.send_message(query.message.chat_id, text)
+        context.bot.send_message(query.message.chat_id, text)
         return 'HANDLE_DESCRIPTION'
-    elif answer.split('_', 2)[0] in (1, 5, 10):
-        print(answer)
-        quantity, product_id = answer.split('_', 2)
+    elif answer.isdigit():
+        quantity = int(answer)
         add_item_to_cart(store_token, product_id, cart_id, quantity)
         return 'HANDLE_DESCRIPTION'
 
 
-def echo(bot, update):
-    users_reply = update.message.text
-    update.message.reply_text(users_reply)
-    return "ECHO"
+def show_cart(update, context):
+    cart_id = update.effective_chat.id
+    cart = get_cart_items(store_token, cart_id)
+    text = make_cart_description(cart)
+    products = cart['data']
+
+    keyboard = [
+        [InlineKeyboardButton('Убрать из корзины {}'.format(product['name']), callback_data=product['id'])]
+            for product in products
+    ]
+    keyboard.append([InlineKeyboardButton('В меню', callback_data='menu')])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.callback_query.message.reply_text(text=text, reply_markup=reply_markup)
+    return 'HANDLE_CART'
 
 
-def handle_users_reply(bot, update):
-    """
-    Функция, которая запускается при любом сообщении от пользователя и решает как его обработать.
+def handle_cart(update, context):
+    query = update.callback_query
+    answer = query.data
 
-    Эта функция запускается в ответ на эти действия пользователя:
-        * Нажатие на inline-кнопку в боте
-        * Отправка сообщения боту
-        * Отправка команды боту
-    Она получает стейт пользователя из базы данных и запускает соответствующую функцию-обработчик (хэндлер).
-    Функция-обработчик возвращает следующее состояние, которое записывается в базу данных.
-    Если пользователь только начал пользоваться ботом, Telegram форсит его написать "/start",
-    поэтому по этой фразе выставляется стартовое состояние.
-    Если пользователь захочет начать общение с ботом заново, он также может воспользоваться этой командой.
-    """
+    if answer == 'menu':
+        keyboard = context.user_data['keyboard']
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.message.reply_text(
+            text='Please choose:',
+            reply_markup=reply_markup
+        )
+        return 'HANDLE_MENU'
+    else:
+        delete_item_from_cart(
+            store_token,
+            cart_id=update.effective_chat.id,
+            product_id=answer
+        )
+        return 'HANDLE_CART'
+
+
+def handle_users_reply(update, context):
+
     db = get_database_connection()
     if update.message:
         user_reply = update.message.text
@@ -123,20 +149,23 @@ def handle_users_reply(bot, update):
         return
     if user_reply == '/start':
         user_state = 'START'
+    elif user_reply == 'cart':
+        user_state = 'SHOW_CART'
     else:
         user_state = db.get(chat_id).decode('utf-8')
     states_functions = {
         'START': start,
-        'ECHO': echo,
         'HANDLE_MENU': handle_menu,
-        'HANDLE_DESCRIPTION': handle_description
+        'HANDLE_DESCRIPTION': handle_description,
+        'SHOW_CART': show_cart,
+        'HANDLE_CART': handle_cart,
     }
     state_handler = states_functions[user_state]
     # Если вы вдруг не заметите, что python-telegram-bot перехватывает ошибки.
     # Оставляю этот try...except, чтобы код не падал молча.
     # Этот фрагмент можно переписать.
     try:
-        next_state = state_handler(bot, update)
+        next_state = state_handler(update, context)
         db.set(chat_id, next_state)
     except Exception as err:
         print(err)

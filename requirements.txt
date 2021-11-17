@@ -1,4 +1,4 @@
 requests==2.26.0
 python-dotenv==0.19.1
-python-telegram-bot==11.1.0
+python-telegram-bot==13.8.1
 redis==3.2.1
