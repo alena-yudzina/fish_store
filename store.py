@@ -8,6 +8,7 @@ def get_token(client_id):
     }
 
     response = requests.post('https://api.moltin.com/oauth/access_token', data=data)
+    response.raise_for_status()
     return response.json()['access_token']
 
 
@@ -20,6 +21,7 @@ def get_products(client_id):
     }
 
     response = requests.get('https://api.moltin.com/v2/products', headers=headers)
+    response.raise_for_status()
     catalog = response.json()
     products = catalog['data']
     return products
@@ -36,6 +38,7 @@ def get_product(client_id, product_id):
         'https://api.moltin.com/v2/products/{}'.format(product_id),
         headers=headers
     )
+    response.raise_for_status()
     return response.json()['data']
 
 
@@ -50,10 +53,12 @@ def download_file(client_id, file_id):
         'https://api.moltin.com/v2/files/{}'.format(file_id),
         headers=headers
     )
+    response.raise_for_status()
     file_description = response.json()
     file_url = file_description['data']['link']['href']
 
     file = requests.get(file_url)
+    file.raise_for_status()
 
     return file_url
 
@@ -75,6 +80,7 @@ def create_customer(client_id, email):
     }
 
     response = requests.post('https://api.moltin.com/v2/customers', headers=headers, json=data)
+    response.raise_for_status()
     response = response.json()
     return response['data']['id']
 
@@ -90,6 +96,7 @@ def get_customer(client_id, customer_id):
         'https://api.moltin.com/v2/customers/{}'.format(customer_id),
         headers=headers
     )
+    response.raise_for_status()
     return response.json()
 
 
@@ -114,6 +121,7 @@ def add_item_to_cart(client_id, product_id, cart_id, quantity):
         headers=headers,
         json=data
     )
+    response.raise_for_status()
 
 
 def delete_item_from_cart(client_id, cart_id, product_id):
@@ -127,6 +135,7 @@ def delete_item_from_cart(client_id, cart_id, product_id):
         'https://api.moltin.com/v2/carts/{}/items/{}'.format(cart_id, product_id),
         headers=headers
     )
+    response.raise_for_status()
 
 
 def get_cart_items(client_id, cart_id):
@@ -140,6 +149,7 @@ def get_cart_items(client_id, cart_id):
         'https://api.moltin.com/v2/carts/{}/items'.format(cart_id),
         headers=headers
     )
+    response.raise_for_status()
     return response.json()
 
 
