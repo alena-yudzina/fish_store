@@ -1,4 +1,5 @@
 import os
+from functools import partial
 
 import redis
 from dotenv import load_dotenv
@@ -8,12 +9,12 @@ from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
 
 from store import (add_item_to_cart, create_customer, delete_item_from_cart,
                    download_file, get_cart_items, get_product, get_products,
-                   make_cart_description)
+                   get_token, make_cart_description)
 
 _database = None
 
-def start(update, context):
-    products = get_products(store_token)
+def start(update, context, access_token):
+    products = get_products(access_token)
 
     keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])]
@@ -28,7 +29,7 @@ def start(update, context):
     return 'HANDLE_MENU'
 
 
-def handle_menu(update, context):
+def handle_menu(update, context, access_token):
     keyboard = [
         [
             InlineKeyboardButton('1 кг', callback_data=1),
@@ -45,13 +46,13 @@ def handle_menu(update, context):
     product_id = query.data
     context.user_data['product_id'] = product_id
 
-    product = get_product(store_token, product_id)
+    product = get_product(access_token, product_id)
 
     name = product['name']
     price = product['meta']['display_price']['with_tax']['formatted']
     description = product['description']
     img_id = product['relationships']['main_image']['data']['id']
-    img_url = download_file(store_token, img_id)
+    img_url = download_file(access_token, img_id)
     product_description = '{0}\n\n{1} per kg\n\n{2}'.format(
         name, price, description
     )
@@ -69,7 +70,7 @@ def handle_menu(update, context):
     return 'HANDLE_DESCRIPTION'
 
 
-def handle_description(update, context):
+def handle_description(update, context, access_token):
     keyboard = context.user_data['keyboard']
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -85,19 +86,19 @@ def handle_description(update, context):
         )
         return 'HANDLE_MENU'
     elif answer == 'cart':
-        cart = get_cart_items(store_token, cart_id)
+        cart = get_cart_items(access_token, cart_id)
         text = make_cart_description(cart)
         context.bot.send_message(query.message.chat_id, text)
         return 'HANDLE_DESCRIPTION'
     elif answer.isdigit():
         quantity = int(answer)
-        add_item_to_cart(store_token, product_id, cart_id, quantity)
+        add_item_to_cart(access_token, product_id, cart_id, quantity)
         return 'HANDLE_DESCRIPTION'
 
 
-def show_cart(update, context):
+def show_cart(update, context, access_token):
     cart_id = update.effective_chat.id
-    cart = get_cart_items(store_token, cart_id)
+    cart = get_cart_items(access_token, cart_id)
     text = make_cart_description(cart)
     products = cart['data']
 
@@ -118,7 +119,7 @@ def show_cart(update, context):
     return 'HANDLE_CART'
 
 
-def handle_cart(update, context):
+def handle_cart(update, context, access_token):
     query = update.callback_query
     answer = query.data
 
@@ -137,25 +138,27 @@ def handle_cart(update, context):
         return 'WAITING_EMAIL'
     else:
         delete_item_from_cart(
-            store_token,
+            access_token,
             cart_id=update.effective_chat.id,
             product_id=answer
         )
         return 'HANDLE_CART'
 
 
-def waiting_email(update, context):
+def waiting_email(update, context, access_token):
     email = update.message.text
-    create_customer(store_token, email)
+    create_customer(access_token, email)
     update.message.reply_text(
         text=f'Ваш email: {email}'
     )
     return 'SHOW_CART'
 
 
-def handle_users_reply(update, context):
+def handle_users_reply(update, context, store_token):
 
     db = get_database_connection()
+    access_token = get_token(store_token)
+
     if update.message:
         user_reply = update.message.text
         chat_id = update.message.chat_id
@@ -171,12 +174,12 @@ def handle_users_reply(update, context):
     else:
         user_state = db.get(chat_id).decode('utf-8')
     states_functions = {
-        'START': start,
-        'HANDLE_MENU': handle_menu,
-        'HANDLE_DESCRIPTION': handle_description,
-        'SHOW_CART': show_cart,
-        'HANDLE_CART': handle_cart,
-        'WAITING_EMAIL': waiting_email,
+        'START': partial(start, access_token=access_token),
+        'HANDLE_MENU': partial(handle_menu, access_token=access_token),
+        'HANDLE_DESCRIPTION': partial(handle_description, access_token=access_token),
+        'SHOW_CART': partial(show_cart, access_token=access_token),
+        'HANDLE_CART': partial(handle_cart, access_token=access_token),
+        'WAITING_EMAIL': partial(waiting_email, access_token=access_token),
     }
     state_handler = states_functions[user_state]
     try:
@@ -199,12 +202,11 @@ def get_database_connection():
 
 if __name__ == '__main__':
     load_dotenv()
-    global store_token
     store_token = os.environ['CLIENT_ID']
     tg_token = os.environ['TELEGRAM_TOKEN']
     updater = Updater(tg_token)
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
-    dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+    dispatcher.add_handler(CallbackQueryHandler(partial(handle_users_reply, store_token=store_token)))
+    dispatcher.add_handler(MessageHandler(Filters.text, partial(handle_users_reply, store_token=store_token)))
+    dispatcher.add_handler(CommandHandler('start', partial(handle_users_reply, store_token=store_token)))
     updater.start_polling()

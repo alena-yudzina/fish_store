@@ -12,9 +12,7 @@ def get_token(client_id):
     return response.json()['access_token']
 
 
-def get_products(client_id):
-    
-    access_token = get_token(client_id)
+def get_products(access_token):
     
     headers = {
         'Authorization': access_token,
@@ -27,8 +25,7 @@ def get_products(client_id):
     return products
 
 
-def get_product(client_id, product_id):
-    access_token = get_token(client_id)
+def get_product(access_token, product_id):
 
     headers = {
         'Authorization': access_token,
@@ -42,8 +39,7 @@ def get_product(client_id, product_id):
     return response.json()['data']
 
 
-def download_file(client_id, file_id):
-    access_token = get_token(client_id)
+def download_file(access_token, file_id):
 
     headers = {
         'Authorization': access_token,
@@ -63,8 +59,7 @@ def download_file(client_id, file_id):
     return file_url
 
 
-def create_customer(client_id, email):
-    access_token = get_token(client_id)
+def create_customer(access_token, email):
 
     headers = {
         'Authorization': access_token,
@@ -85,8 +80,7 @@ def create_customer(client_id, email):
     return response['data']['id']
 
 
-def get_customer(client_id, customer_id):
-    access_token = get_token(client_id)
+def get_customer(access_token, customer_id):
 
     headers = {
         'Authorization': access_token,
@@ -100,8 +94,7 @@ def get_customer(client_id, customer_id):
     return response.json()
 
 
-def add_item_to_cart(client_id, product_id, cart_id, quantity):
-    access_token = get_token(client_id)
+def add_item_to_cart(access_token, product_id, cart_id, quantity):
     
     headers = {
         'Authorization': access_token,
@@ -124,8 +117,7 @@ def add_item_to_cart(client_id, product_id, cart_id, quantity):
     response.raise_for_status()
 
 
-def delete_item_from_cart(client_id, cart_id, product_id):
-    access_token = get_token(client_id)
+def delete_item_from_cart(access_token, cart_id, product_id):
 
     headers = {
         'Authorization': access_token,
@@ -138,8 +130,7 @@ def delete_item_from_cart(client_id, cart_id, product_id):
     response.raise_for_status()
 
 
-def get_cart_items(client_id, cart_id):
-    access_token = get_token(client_id)
+def get_cart_items(access_token, cart_id):
 
     headers = {
         'Authorization': access_token,
