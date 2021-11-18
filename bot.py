@@ -75,23 +75,23 @@ def handle_description(update, context, access_token):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     query = update.callback_query
-    answer = query.data
+    user_choice = query.data
     cart_id = update.effective_chat.id
     product_id = context.user_data['product_id']
 
-    if answer == 'back':
+    if user_choice == 'back':
         query.message.reply_text(
             text='Please choose:',
             reply_markup=reply_markup
         )
         return 'HANDLE_MENU'
-    elif answer == 'cart':
+    elif user_choice == 'cart':
         cart = get_cart_items(access_token, cart_id)
         text = make_cart_description(cart)
         context.bot.send_message(query.message.chat_id, text)
         return 'HANDLE_DESCRIPTION'
-    elif answer.isdigit():
-        quantity = int(answer)
+    elif user_choice.isdigit():
+        quantity = int(user_choice)
         add_item_to_cart(access_token, product_id, cart_id, quantity)
         return 'HANDLE_DESCRIPTION'
 
@@ -121,9 +121,9 @@ def show_cart(update, context, access_token):
 
 def handle_cart(update, context, access_token):
     query = update.callback_query
-    answer = query.data
+    user_choice = query.data
 
-    if answer == 'menu':
+    if user_choice == 'menu':
         keyboard = context.user_data['keyboard']
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.message.reply_text(
@@ -131,7 +131,7 @@ def handle_cart(update, context, access_token):
             reply_markup=reply_markup
         )
         return 'HANDLE_MENU'
-    elif answer == 'pay':
+    elif user_choice == 'pay':
         query.message.reply_text(
             text='Пожалуйста, пришлите ваш email.'
         )
@@ -140,7 +140,7 @@ def handle_cart(update, context, access_token):
         delete_item_from_cart(
             access_token,
             cart_id=update.effective_chat.id,
-            product_id=answer
+            product_id=user_choice
         )
         return 'HANDLE_CART'
 
