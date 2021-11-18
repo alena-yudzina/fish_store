@@ -84,6 +84,10 @@ def handle_description(update, context, access_token):
             text='Please choose:',
             reply_markup=reply_markup
         )
+        context.bot.delete_message(
+            chat_id=update.effective_chat.id,
+            message_id=update.callback_query.message.message_id
+        )
         return 'HANDLE_MENU'
     elif user_choice == 'cart':
         cart = get_cart_items(access_token, cart_id)
@@ -116,6 +120,10 @@ def show_cart(update, context, access_token):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     update.callback_query.message.reply_text(text=text, reply_markup=reply_markup)
+    context.bot.delete_message(
+        chat_id=update.effective_chat.id,
+        message_id=update.callback_query.message.message_id
+    )
     return 'HANDLE_CART'
 
 
@@ -130,10 +138,18 @@ def handle_cart(update, context, access_token):
             text='Please choose:',
             reply_markup=reply_markup
         )
+        context.bot.delete_message(
+            chat_id=update.effective_chat.id,
+            message_id=update.callback_query.message.message_id
+        )
         return 'HANDLE_MENU'
     elif user_choice == 'pay':
         query.message.reply_text(
             text='Пожалуйста, пришлите ваш email.'
+        )
+        context.bot.delete_message(
+            chat_id=update.effective_chat.id,
+            message_id=update.callback_query.message.message_id
         )
         return 'WAITING_EMAIL'
     else:
@@ -142,7 +158,17 @@ def handle_cart(update, context, access_token):
             cart_id=update.effective_chat.id,
             product_id=user_choice
         )
-        return 'HANDLE_CART'
+        keyboard = context.user_data['keyboard']
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.message.reply_text(
+            text='Товар удален. Выберите товар для просмотра.',
+            reply_markup=reply_markup
+        )
+        context.bot.delete_message(
+            chat_id=update.effective_chat.id,
+            message_id=update.callback_query.message.message_id
+        )
+        return 'HANDLE_MENU'
 
 
 def waiting_email(update, context, access_token):
