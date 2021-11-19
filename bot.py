@@ -1,7 +1,9 @@
 import os
 from functools import partial
+from datetime import datetime
 
 import redis
+import requests
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
@@ -200,10 +202,18 @@ def waiting_email(update, context, access_token):
     return 'START'
 
 
-def handle_users_reply(update, context, store_token):
+def handle_users_reply(update, context, client_id):
 
     db = get_database_connection()
-    access_token = get_token(store_token)
+    if context.user_data.get('token_timestamp'):
+        diff = datetime.now() - context.user_data['token_timestamp']
+        if diff.total_seconds() >= 3600:
+            context.user_data['token_timestamp'] = datetime.now()
+            context.user_data['access_token'] = get_token(client_id)
+    else:
+        context.user_data['token_timestamp'] = datetime.now()
+        context.user_data['access_token'] = get_token(client_id)
+    access_token = context.user_data['access_token']
 
     if update.message:
         user_reply = update.message.text
@@ -245,11 +255,27 @@ def get_database_connection():
 
 if __name__ == '__main__':
     load_dotenv()
-    store_token = os.environ['CLIENT_ID']
+    client_id = os.environ['CLIENT_ID']
     tg_token = os.environ['TELEGRAM_TOKEN']
+
     updater = Updater(tg_token)
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CallbackQueryHandler(partial(handle_users_reply, store_token=store_token)))
-    dispatcher.add_handler(MessageHandler(Filters.text, partial(handle_users_reply, store_token=store_token)))
-    dispatcher.add_handler(CommandHandler('start', partial(handle_users_reply, store_token=store_token)))
+    dispatcher.add_handler(CallbackQueryHandler(
+        partial(
+            handle_users_reply,
+            client_id=client_id,
+        )
+    ))
+    dispatcher.add_handler(MessageHandler(
+        Filters.text, partial(
+            handle_users_reply,
+            client_id=client_id,
+        )
+    ))
+    dispatcher.add_handler(CommandHandler(
+        'start', partial(
+            handle_users_reply,
+            client_id=client_id,
+        )
+    ))
     updater.start_polling()
